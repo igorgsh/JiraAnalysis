@@ -31,7 +31,7 @@ if (!array_key_exists("jql", $_GET) || $_GET["jql"] == "") {
 $usrPwd = 'igorgsh@gmail.com:NQTdRRcaizU9jc2kcof72B51';
 $baseUrl = "https://flyingdonkey.atlassian.net/rest/api/3";
 $method = "search?jql=".$jql;
-$method = $method."&fields=customfield_10034";
+$method = $method."&fields=customfield_10034,timetracking";
 $fullUrl = $baseUrl.'/'.$method;
 
 //echo $fullUrl."<BR/>\n";
@@ -45,6 +45,7 @@ $fullUrl = urlencode($fullUrl);
 //    "fields": {
 //        "timetracking":{
 //        "originalEstimate": "1h"
+//		  "remainingEstimate": "0h"
 //        }
 //    }
 //} 
@@ -68,12 +69,20 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl, $usrPwd, $startIssues)
 		if (!$est) {
 			$est = 0;
 		}
+		$remEst = round(($est*3600-$issue["fields"]["timetracking"]["timeSpentSeconds"])/3600,1);
+//echo "rem1=".$remEst;
+//echo "<BR/>\n";	
+		
+		if ($remEst < 0) {
+			$remEst = 0;
+		}
 		$body = '{';
 		$body .= '"id":"'.$issue["id"].'",';
 		$body .= '"self":"'.$issue["self"].'",';
 		$body .= '"key":"'.$issue["key"].'",';
 		$body .= '"fields": {"timetracking": {';
-		$body .= '"originalEstimate":"'.$est.'h"';
+		$body .= '"originalEstimate":"'.$est.'h", ';
+		$body .= '"remainingEstimate":"'.$remEst.'h"';
 		$body .='}}}';
 		//echo $body."<BR/>\n";
 print_r ($body);		
