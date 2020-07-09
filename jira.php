@@ -90,12 +90,18 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 		$url = $baseUrl."/issue/".$issue["key"]."/changelog?dummy";
 		
 		$clDay = array();
-		$initialEstimation="";
-		$initialEstimationDate = date_create_from_format('Y-m-d\TH:i:s.ve',$issue["fields"]["created"], $defTZ);
+		if ($issue["fields"]["aggregatetimeoriginalestimate"]!=0) {
+			$initialEstimation=$issue["fields"]["aggregatetimeoriginalestimate"];
+			$initialEstimationDate = date_create_from_format('Y-m-d\TH:i:s.ve',$issue["fields"]["created"], $defTZ);
+		} else {
+			$initialEstimation=0;
+			$initialEstimationDate = date_create_from_format('Y-m-d\TH:i:s.ve',"2030-01-01T00:00:00.000+0100", $defTZ);
+		}
 		$closeDate = $initialEstimationDate;
 		$spentAuthor = array();
 		
-//echo "created=".$issue["fields"]["created"];
+//echo "created=".$issue["fields"]["created"]."<br/>\n";
+//echo "Estimate=".$initialEstimation."<br/>\n";
 //var_dump($initialEstimationDate);
 
 		for ($startClog = 0, $clogArray = readPortion($url,$startClog); 
@@ -110,7 +116,8 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 				$dayCL = date_format($clDate,'Y-m-d');
 				$author = $hist["author"]["displayName"];
 				foreach ($hist["items"] as $item) {
-				//Get Initial Estimation
+//var_dump($item);
+				
 					$EstChange = 0;
 					$ReOpenCounter = 0;
 					$ReOpenReason = "";
@@ -118,9 +125,18 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 
 					//if ($item["field"] == "Dev Estimate") { 
 					if ($item["field"] == "timeoriginalestimate") {
-						if ($clDate < $initialEstimationDate) {
-							$initialEstimation=$item["toString"];
-							$initialEstimationDate = $clDate;
+//var_dump($initialEstimationDate);
+//var_dump($clDate);					
+						if ($item["toString"] == 0 
+						AND $issue["fields"]["aggregatetimeoriginalestimate"] != 0) {
+						// just subtasks are estimated  - nothing to do?
+						} else {
+							//task has own estimation
+							if ($clDate < $initialEstimationDate) {
+								$initialEstimation=$item["toString"];
+								$initialEstimationDate = $clDate;
+//echo "Estimation changed =".$initialEstimation."\n";								
+							}
 						}
 					}
 					if ($item["field"] == "status" AND $item["toString"]=="Done") {
@@ -252,7 +268,7 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 				}
 				echo $DELIM;	
 
-				echo $QUOTESIGN.$initialEstimation.$QUOTESIGN;
+				echo $QUOTESIGN.round($initialEstimation/3600,2).$QUOTESIGN;
 				echo $DELIM;	
 
 
