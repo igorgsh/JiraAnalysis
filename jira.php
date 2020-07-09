@@ -47,8 +47,7 @@ if (!array_key_exists("jql", $_GET) || $_GET["jql"] == "") {
 $packetSize=10;
 $DELIM = ";";
 $QUOTESIGN = '"';
-$fieldList = "project,customfield_10105,key,status,resolution,creator,assignee,aggregatetimeoriginalestimate,aggregatetimespent";
-$fieldList = "aggregatetimespent,resolution,project,assignee,status,summary,reporter,customfield_10034,customfield_10036,customfield_10039,customfield_10040";
+$fieldList = "resolution,project,assignee,status,summary,reporter,customfield_10034,customfield_10036,customfield_10039,customfield_10040,aggregatetimeoriginalestimate,aggregatetimespent,created,timeoriginalestimate";
 
 $baseUrl = "https://flyingdonkey.atlassian.net/rest/api/3";
 $issueUrl = "https://flyingdonkey.atlassian.net/browse/";
@@ -75,7 +74,7 @@ header("Content-Description: File Transfer");
 header("Content-Disposition: attachment; filename=$filename");
 header("Content-Type: application/txt");
 
-echo "Date Change;Project;Issue;Status;Resolution;Reporter;Assignee;Initial Estimation;Current Estimation;Total Time Spent;Credit;Summary;Total Reopen Counter;URL;Author of Change;Estimation Change;Reopen Counter;Reopen Reason;Time Spent Logged;Total Time Spent for ticket;Key-Author;Initial Estimation Set";
+echo "Date Change;Project;Issue;Status;Resolution;Reporter;Assignee;Initial Estimation;Current Estimation;Total Time Spent;Credit;Summary;Total Reopen Counter;URL;Author of Change;Estimation Change;Reopen Counter;Reopen Reason;Time Spent Logged;Total Time Spent for ticket;Key-Author;Initial Estimation Set;Date of close";
 
 echo $NEWLINE;
 
@@ -92,8 +91,12 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 		
 		$clDay = array();
 		$initialEstimation="";
-		$initialEstimationDate = date_create_from_format('Y-m-d','2020-12-31', $defTZ);
+		$initialEstimationDate = date_create_from_format('Y-m-d\TH:i:s.ve',$issue["fields"]["created"], $defTZ);
+		$closeDate = $initialEstimationDate;
 		$spentAuthor = array();
+		
+//echo "created=".$issue["fields"]["created"];
+//var_dump($initialEstimationDate);
 
 		for ($startClog = 0, $clogArray = readPortion($url,$startClog); 
 			$clogArray && $startClog < $clogArray["total"]; 
@@ -113,13 +116,19 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 					$ReOpenReason = "";
 				
 
-					if ($item["field"] == "Dev Estimate") { 
+					//if ($item["field"] == "Dev Estimate") { 
+					if ($item["field"] == "timeoriginalestimate") {
 						if ($clDate < $initialEstimationDate) {
 							$initialEstimation=$item["toString"];
 							$initialEstimationDate = $clDate;
 						}
 					}
-				
+					if ($item["field"] == "status" AND $item["toString"]=="Done") {
+						if ($clDate > $closeDate) {
+							$closeDate = $clDate;
+						}
+					}
+					
 					if ($clDate >= $dateBeg AND $clDate <=  $dateEnd) {
 						if ($item["field"] == "Dev Estimate" AND !is_null($item["fromString"]) ) { //Dev Estimation changed
 							$EstChange= $item["toString"] - $item["fromString"];
@@ -207,7 +216,7 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 			}
 		}
 		
-//echo "Date Change;Project;Issue;Status;Resolution;Reporter;Assignee;Initial Estimation;Current Estimation;Total Time Spent;Credit;Summary;Total Reopen Counter;URL;Author of Change;Estimation Change;Reopen Counter;Reopen Reason;Time Spent Logged;Total Time Spent for ticket;Key-Author;Initial Estimation Set";
+//echo "Date Change;Project;Issue;Status;Resolution;Reporter;Assignee;Initial Estimation;Current Estimation;Total Time Spent;Credit;Summary;Total Reopen Counter;URL;Author of Change;Estimation Change;Reopen Counter;Reopen Reason;Time Spent Logged;Total Time Spent for ticket;Key-Author;Initial Estimation Set;Date of close";
 
 		foreach ($clDay as $dayKey => $dayValue) {
 			foreach ($dayValue["author"] as $dAuthor => $vAuthor) {
@@ -225,14 +234,22 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 				echo $QUOTESIGN.$issue["fields"]["status"]["name"].$QUOTESIGN;
 				echo $DELIM;	
 			
-				echo $QUOTESIGN.$issue["fields"]["resolution"]["name"].$QUOTESIGN;
+				if (array_key_exists("resolution", $issue) AND $QUOTESIGN.$issue["fields"]["resolution"]) { 
+					echo $QUOTESIGN.$issue["fields"]["resolution"]["name"].$QUOTESIGN;
+				} else {
+					echo $QUOTESIGN.$QUOTESIGN;
+				}
 				echo $DELIM;
 	
 
 				echo $QUOTESIGN.$issue["fields"]["reporter"]["displayName"].$QUOTESIGN;
 				echo $DELIM;	
 
-				echo $QUOTESIGN.$issue["fields"]["assignee"]["displayName"].$QUOTESIGN;
+				if (array_key_exists("assignee", $issue) AND $QUOTESIGN.$issue["fields"]["assignee"]) { 
+					echo $QUOTESIGN.$issue["fields"]["assignee"]["displayName"].$QUOTESIGN;
+				} else {
+					echo $QUOTESIGN.$QUOTESIGN;
+				}
 				echo $DELIM;	
 
 				echo $QUOTESIGN.$initialEstimation.$QUOTESIGN;
@@ -240,7 +257,8 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 
 
 //Dev Estimate
-				echo $QUOTESIGN.$issue["fields"]["customfield_10034"].$QUOTESIGN;
+//				echo $QUOTESIGN.$issue["fields"]["customfield_10034"].$QUOTESIGN;
+				echo $QUOTESIGN.round($issue["fields"]["aggregatetimeoriginalestimate"]/3600,2).$QUOTESIGN;
 				echo $DELIM;	
 
 				echo $QUOTESIGN.round($issue["fields"]["aggregatetimespent"]/3600,2).$QUOTESIGN;
@@ -284,6 +302,13 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl,$startIssues);
 
 				echo $QUOTESIGN.$initialEstimationDate->format('Y-m-d').$QUOTESIGN;
 				echo $DELIM;
+
+				if ($issue["fields"]["status"]["name"]=="Done") {
+					echo $QUOTESIGN.$closeDate->format('Y-m-d').$QUOTESIGN;
+				} else {
+					echo $QUOTESIGN.$QUOTESIGN;		
+				}
+				//echo $DELIM;
 
 				echo $NEWLINE;
 		

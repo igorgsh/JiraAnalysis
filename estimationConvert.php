@@ -65,11 +65,17 @@ for ($startIssues = 0, $jsonArray = readPortion($fullUrl, $usrPwd, $startIssues)
     foreach ($issues as $issue ) {
 //var_dump($issue);
 //echo "<BR/>\n";	
-		$est = $issue["fields"]["customfield_10034"];
+		$est = round($issue["fields"]["customfield_10034"],1);
 		if (!$est) {
 			$est = 0;
 		}
-		$remEst = round(($est*3600-$issue["fields"]["timetracking"]["timeSpentSeconds"])/3600,1);
+		if (array_key_exists("timetracking",$issue["fields"]) 
+			AND array_key_exists("timeSpentSeconds",$issue["fields"]["timetracking"])) {
+			$remEst = round(($est*3600-$issue["fields"]["timetracking"]["timeSpentSeconds"])/3600,1);
+		} else {
+			$remEst = $est;
+		}
+				
 //echo "rem1=".$remEst;
 //echo "<BR/>\n";	
 		
